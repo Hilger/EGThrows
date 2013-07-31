@@ -1,0 +1,75 @@
+import json
+import re
+from BeautifulSoup import BeautifulSoup
+from boto.s3.connection import S3Connection
+from boto.s3.key import Key
+
+date, league, player, moment, versus, url = \
+[
+"Sunday, July 21st",
+"The Premiere League 5 SuperCup",
+"DeMoN",
+[2013, 6, 21, 12],
+"Mouz",
+"z3RPzI_3TT8"
+]
+
+############################## WRITING TO HTML ##############################
+
+with open("E:/EG Stuff/egthrowredesign/EGThrow.html", 'r') as _html:
+    soup = BeautifulSoup(_html)
+
+    old_player = soup.find(id="player").string
+    old_date = soup.find(id="date").string
+    old_league = soup.find(id="league").string
+    old_versus = soup.find(id="versus").string
+    old_url = re.search(r"embed/(.+)\?vq", soup.iframe["src"]).group(1).encode('ascii')
+    old_moment = map(int, re.search(r"\[(.+)\]", soup.find(id="moment")
+                    .string).group(1).encode('ascii').split(','))
+
+    soup.find(id="player").string = player
+    soup.find(id="date").string = date
+    soup.find(id="league").string = league
+    soup.find(id="versus").string = versus
+    soup.iframe["src"] = "http://youtube.com/embed/" + url + "?vq=hd720"
+    soup.find(id="moment").string = \
+        "document.getElementById('timeSince')\
+        .appendChild(document.createTextNode(moment(%s)\
+        .fromNow(true)))" % moment
+
+with open("E:/EG Stuff/egthrowredesign/EGThrow.html", 'w') as _html:
+    _html.write(str(soup))
+
+############################# WRITING TO JSON ##############################
+
+with open("E:/EG Stuff/egthrowredesign/EGThrowArchive.json", 'r') as _json:
+    eg_json = json.load(_json)
+    old_throw = {
+        "date" : old_date,
+        "league" : old_league,
+        "player" : old_player,
+        "moment" : old_moment,
+        "versus" : old_versus,
+        "url" : "http://www.youtube.com/watch?v=" + old_url
+    }
+    eg_json.append(old_throw)
+
+with open("E:/EG Stuff/egthrowredesign/EGThrowArchive.json", 'w') as _json:
+    json.dump(eg_json, _json)
+
+############################# STORING IN S3 #################################
+
+access_key = "REDACTED"
+secret_key = "REDACTED"
+bucket = "whendidegthrowlast.com"
+
+conn = S3Connection(access_key, secret_key)
+mybucket = conn.get_bucket(bucket)
+
+k = Key(mybucket)
+k.key = "EGThrow.html"
+k.set_contents_from_filename("EGThrow.html")
+
+k = Key(mybucket)
+k.key = "EGThrowArchive.json"
+k.set_contents_from_filename("EGThrowArchive.json")
